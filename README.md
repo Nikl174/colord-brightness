@@ -1,5 +1,6 @@
 # ICC Color Brightness
 use ICC color profiles to change the brightness of the display
+inspired by [icc-brightness](https://github.com/udifuchs/icc-brightness)
 
 ## workarround for icc file
 - for a icc profile (which is needed for a setting it system wide) a file need to be saved some ware -> read/write in the slow SSD 
