@@ -43,7 +43,7 @@ public:
   file_watch_error startWatching(std::filesystem::path file);
 
   // blocking
-  std::string waitAndGet();
+  std::optional<std::string> waitAndGet();
 
   // not blocking, optional
   std::optional<std::string> getWhenChanged();
@@ -58,18 +58,19 @@ public:
 protected:
   std::filesystem::path _file_to_watch;
   std::atomic_bool _watching;
-  std::shared_ptr<std::string> _changed_file_content;
-  std::shared_ptr<std::mutex>
-      _cv_mut; /*<! mutex for the lock in the condition_variable */
-  std::shared_ptr<std::condition_variable>
-      _notify_waiter; /*!< for notification of the wait_and_get() - caller */
+  std::string _changed_file_content;
+  std::mutex _cv_mut; /*<! mutex for the lock in the condition_variable */
+  std::condition_variable
+      _notify_waiter_cv; /*!< for notification of the wait_and_get() - caller */
   int _inotify_fd; /*!< file descriptor for the inotify instance used to detect
                       file changes */
-  int _watch_fd;    /*!< file descriptor for the watch instance for _file_to_watch*/
+  int _watch_fd;   /*!< file descriptor for the watch instance for
+                      _file_to_watch*/
   std::thread _watching_thread;
 
-
   void fileWatchThread();
+  bool updateFileContent();
+  void setFileContent(std::string new_content);
 };
 
 #endif /* end of include guard: FILEWATCHER_H */
