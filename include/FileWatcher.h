@@ -39,20 +39,20 @@ enum class file_watch_error {
 class FileWatcher {
 public:
   FileWatcher(std::filesystem::path file) noexcept(false);
-  file_watch_error start_watching();
-  file_watch_error start_watching(std::filesystem::path file);
+  file_watch_error startWatching();
+  file_watch_error startWatching(std::filesystem::path file);
 
   // blocking
-  std::string wait_and_get();
+  std::string waitAndGet();
 
   // not blocking, optional
-  std::optional<std::string> get_when_changed();
+  std::optional<std::string> getWhenChanged();
 
   // optional or needed?
   template <class Rep, class Period>
   std::optional<std::string>
-  wait_for_and_get(std::chrono::duration<Rep, Period> time);
-  bool stop_watching();
+  waitForAndGet(std::chrono::duration<Rep, Period> time);
+  bool stopWatching();
   virtual ~FileWatcher();
 
 protected:
@@ -69,7 +69,7 @@ protected:
   std::thread _watching_thread;
 
 
-  void file_watch_thread();
+  void fileWatchThread();
 };
 
 #endif /* end of include guard: FILEWATCHER_H */

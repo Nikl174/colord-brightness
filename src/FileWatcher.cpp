@@ -16,7 +16,7 @@
 
 std::string read_from_file(std::filesystem::path file) {}
 
-void FileWatcher::file_watch_thread() {
+void FileWatcher::fileWatchThread() {
   char buf[INOTIFY_BUF_SIZE];
   while (watching) {
     // block/wait for occurrence of an event
@@ -56,7 +56,7 @@ FileWatcher::FileWatcher(std::filesystem::path file)
   }
 }
 
-file_watch_error FileWatcher::start_watching(std::filesystem::path file) {
+file_watch_error FileWatcher::startWatching(std::filesystem::path file) {
   if (_watching) {
     return file_watch_error::error_still_watching;
   }
