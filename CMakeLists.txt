@@ -5,7 +5,11 @@ project(
   LANGUAGES CXX)
 include(CTest)
 
+set(CMAKE_C_COMPILER "/usr/bin/gcc")
+set(CMAKE_CPP_COMPILER "/usr/bin/c++")
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -25,7 +29,7 @@ target_sources(test_file_watcher PRIVATE tests/test_file_watcher.cpp)
 target_link_libraries(test_file_watcher file_watcher)
 add_test(NAME test_file_watcher COMMAND test_file_watcher)
 
-# add_executable(test tests/test.cpp)
-# target_link_libraries(test ${COLORD_LIBRARIES} ${LCMS2_LIBRARIES})
-# target_include_directories(test PUBLIC ${COLORD_INCLUDE_DIRS}
-#                                        ${LCMS2_INCLUDE_DIRS})
+add_executable(poc_test tests/test.cpp)
+target_link_libraries(poc_test ${COLORD_LIBRARIES} ${LCMS2_LIBRARIES})
+target_include_directories(poc_test PUBLIC ${COLORD_INCLUDE_DIRS}
+                                       ${LCMS2_INCLUDE_DIRS})
