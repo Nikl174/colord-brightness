@@ -142,16 +142,36 @@ std::optional<std::string> FileWatcher::waitAndGet() {
   }
 }
 
+template <class Rep, class Period>
+std::optional<std::string>
+FileWatcher::waitForAndGet(std::chrono::duration<Rep, Period> time) {
+  if (*_watching) {
+    std::unique_lock<std::mutex> lk(*_cv_mut);
+    auto updated = _updated;
+    std::cout << "[DEBUG]: Waiting for event from Filewatcher ..." << std::endl;
+    _notify_waiter_cv->wait_for(lk,time);
+    return *_changed_file_content;
+  } else {
+    return std::nullopt;
+  }
+}
+
 /*! TODO: Improve overall structure
  *  \todo Improve overall structure
  */
 std::optional<std::string> FileWatcher::getWhenChanged() {
   pollfd fds;
   fds.fd = _inotify_fd;
-  int ret = poll(&fds, 1, -1);
-  std::cout << "Received " << ret << "events from fds" << std::endl;
-  updateFileContent(_cv_mut, _file_to_watch, _changed_file_content);
-  return *_changed_file_content;
+  int ret = poll(&fds, 1, 0);
+  if (ret > 0) {
+    char buf[INOTIFY_BUF_SIZE];
+    int len = read(_inotify_fd, buf, sizeof(buf));
+    if (len > 0) {
+      updateFileContent(_cv_mut, _file_to_watch, _changed_file_content);
+      return *_changed_file_content;
+    }
+  }
+  return std::nullopt;
 }
 
 bool FileWatcher::stopWatching() {
