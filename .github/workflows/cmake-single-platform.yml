@@ -18,7 +18,7 @@ jobs:
     - uses: actions/checkout@v3
     # todo improve dep install
     - name: Install dependencies
-      run: sudo apt-get install -y liblcms2-dev colord libeasyloggingpp-dev
+      run: sudo apt-get install -y liblcms2-dev colord libeasyloggingpp-dev libcolord-dev libcolord2
       
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
