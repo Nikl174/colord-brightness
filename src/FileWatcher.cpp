@@ -20,6 +20,11 @@
 #include <thread>
 #include <unistd.h>
 
+void sig_int_handler(int sig) {
+  std::cout << "[DEBUG]: Received sig: " << sig
+            << " in thread: " << std::this_thread::get_id() << std::endl;
+}
+
 bool updateFileContent(std::shared_ptr<std::mutex> mut,
                        std::filesystem::path file_path,
                        std::shared_ptr<std::string> changed_file_content) {
@@ -89,6 +94,11 @@ FileWatcher::FileWatcher(std::filesystem::path file)
        << strerror(errno);
     throw std::runtime_error(ss.str().c_str());
   }
+
+  // set a signal handler, std::signal does not work, because we want to mask
+  // the SIGINT for the thread stopping (the signal used can be changed though)
+  struct sigaction sa = {&sig_int_handler, 0, 0};
+  sigaction(SIGINT, &sa, NULL);
 }
 
 file_watch_error FileWatcher::startWatching(std::filesystem::path file) {
@@ -149,7 +159,7 @@ FileWatcher::waitForAndGet(std::chrono::duration<Rep, Period> time) {
     std::unique_lock<std::mutex> lk(*_cv_mut);
     auto updated = _updated;
     std::cout << "[DEBUG]: Waiting for event from Filewatcher ..." << std::endl;
-    _notify_waiter_cv->wait_for(lk,time);
+    _notify_waiter_cv->wait_for(lk, time);
     return *_changed_file_content;
   } else {
     return std::nullopt;
@@ -179,8 +189,10 @@ bool FileWatcher::stopWatching() {
   if (_watching_thread.joinable()) {
     // send a signal to stop the reading for the fd/waiting for a file
     // modification if needed
-    int send_sig = pthread_kill(_watching_thread.native_handle(), SIGABRT);
+    int send_sig = pthread_kill(_watching_thread.native_handle(), SIGINT);
     if (send_sig != 0) {
+      std::cerr << "[ERROR]: Couldnt send signal to thread, errno: "
+                << strerror(errno) << std::endl;
       return false;
     }
     _watching_thread.join();
@@ -190,6 +202,7 @@ bool FileWatcher::stopWatching() {
     }
   }
   _notify_waiter_cv->notify_all();
+  std::cout << "[DEBUG]: Stopped watching" << std::endl;
   return true;
 }
 
