@@ -17,12 +17,22 @@ find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(COLORD REQUIRED colord)
 pkg_check_modules(LCMS2 REQUIRED lcms2)
+pkg_check_modules(EASYLOGGINGPP REQUIRED easyloggingpp)
 
 set(FILE_WATCHER_SRC ${SRC_DIR}/FileWatcher.cpp)
+set(COLORD_HANDLER_SRC ${SRC_DIR}/ColordHandler.cpp)
 
 add_library(file_watcher)
 target_sources(file_watcher PRIVATE ${FILE_WATCHER_SRC})
-target_include_directories(file_watcher PUBLIC ${INCLUDE_DIR})
+target_include_directories(file_watcher PUBLIC ${INCLUDE_DIR}
+                                               ${EASYLOGGINGPP_INCLUDE_DIRS})
+
+add_library(colord_handler)
+target_sources(colord_handler PRIVATE ${COLORD_HANDLER_SRC})
+target_include_directories(
+  colord_handler PUBLIC ${INCLUDE_DIR} ${COLORD_INCLUDE_DIRS}
+                        ${LCMS2_INCLUDE_DIRS}${EASYLOGGINGPP_INCLUDE_DIRS})
+target_link_libraries(colord_handler ${COLORD_LIBRARIES} ${LCMS2_LIBRARIES})
 
 add_executable(test_file_watcher)
 target_sources(test_file_watcher PRIVATE tests/test_file_watcher.cpp)
@@ -32,4 +42,4 @@ add_test(NAME test_file_watcher COMMAND test_file_watcher)
 add_executable(poc_test tests/test.cpp)
 target_link_libraries(poc_test ${COLORD_LIBRARIES} ${LCMS2_LIBRARIES})
 target_include_directories(poc_test PUBLIC ${COLORD_INCLUDE_DIRS}
-                                       ${LCMS2_INCLUDE_DIRS})
+                                           ${LCMS2_INCLUDE_DIRS})
