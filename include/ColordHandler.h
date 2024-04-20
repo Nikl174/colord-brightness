@@ -34,10 +34,10 @@ protected:
   bool makeProfileFromIccDefault(CdIcc icc_file, uint display_device_id);
   std::optional<CdIcc> createIccFromEdid(std::filesystem::path edid_file_path);
 
-  int mem_fd_; /*!< file descriptor for the icc file */
-  std::filesystem::path mem_fd_path_;
-  CdClient cd_client_;
-  GCancellable cancle_request_; /*!< for future cancellation*/
+  int _mem_fd; /*!< file descriptor for the icc file */
+  std::filesystem::path _mem_fd_path;
+  CdClient _cd_client;
+  GCancellable _cancle_request; /*!< for future cancellation, currently unused*/
 };
 
 #endif /* end of include guard: COLORDHANDLER_H */
