@@ -48,6 +48,7 @@ public:
    *  \param file file to watch for changes
    *  \throws std::system_error if the inotify-file-descriptor couldn't get
    * initialsied
+   *  \throws std::runtime_error if the path given does not exist
    */
   FileWatcher(std::filesystem::path file) noexcept(false);
   file_watch_error startWatching();

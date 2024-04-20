@@ -22,6 +22,7 @@
 #include <thread>
 #include <unistd.h>
 
+// -----------------Helper  functions----------------
 void sig_int_handler(int sig) {
   LOG(DEBUG) << "Received sig: " << sig
              << " in thread: " << std::this_thread::get_id();
@@ -85,12 +86,18 @@ void fileWatchThread(int inot_fd, std::filesystem::path file_path,
   }
 }
 
+// -------------------------------------
+
 FileWatcher::FileWatcher(std::filesystem::path file)
     : _file_to_watch(file), _updated(std::make_shared<std::atomic_bool>(false)),
       _watching(std::make_shared<std::atomic_bool>(false)),
       _cv_mut(std::make_shared<std::mutex>()), _watching_thread(),
       _notify_waiter_cv(std::make_shared<std::condition_variable>()),
       _changed_file_content(std::make_shared<std::string>("")), _watch_fd(-1) {
+
+  if (!std::filesystem::exists(file)) {
+      throw std::runtime_error("File does not exist!");
+  }
   _inotify_fd = inotify_init();
   if (_inotify_fd == -1) {
     std::stringstream ss;
