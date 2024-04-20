@@ -38,6 +38,17 @@ enum class file_watch_error {
  */
 class FileWatcher {
 public:
+  /*! \brief Constructor initialises the inotify-file-descriptor and signal
+   * handling
+   *
+   *  initialises shared_ptr and inotify-context and adds a signal handler for
+   * SIGINT used to stop the thread, when its started later with
+   * FileWatcher::startWatching()
+   *
+   *  \param file file to watch for changes
+   *  \throws std::system_error if the inotify-file-descriptor couldn't get
+   * initialsied
+   */
   FileWatcher(std::filesystem::path file) noexcept(false);
   file_watch_error startWatching();
   file_watch_error startWatching(std::filesystem::path file);
@@ -60,7 +71,8 @@ protected:
   std::shared_ptr<std::atomic_bool> _watching;
   std::shared_ptr<std::atomic_bool> _updated;
   std::shared_ptr<std::string> _changed_file_content;
-  std::shared_ptr<std::mutex> _cv_mut; /*<! mutex for the lock in the condition_variable */
+  std::shared_ptr<std::mutex>
+      _cv_mut; /*<! mutex for the lock in the condition_variable */
   std::shared_ptr<std::condition_variable>
       _notify_waiter_cv; /*!< for notification of the wait_and_get() - caller */
   int _inotify_fd; /*!< file descriptor for the inotify instance used to detect
@@ -68,7 +80,6 @@ protected:
   int _watch_fd;   /*!< file descriptor for the watch instance for
                       _file_to_watch*/
   std::thread _watching_thread;
-
 };
 
 #endif /* end of include guard: FILEWATCHER_H */
