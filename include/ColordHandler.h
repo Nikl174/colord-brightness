@@ -25,13 +25,15 @@ public:
    *  \throws std::runtime_error::system_error if the fd couldn't get created
    */
   ColordHandler(std::filesystem::path path_for_icc) noexcept(false);
-  bool setDefaultProfile(uint display_device_id = 0);
+  // bool setDefaultProfile(std::filesystem::path edid_file_path, uint display_device_id = 0);
   bool setIccFromCmsProfile(cmsHPROFILE profile, uint display_device_id = 0);
   virtual ~ColordHandler();
 
 protected:
   std::optional<CdDevice> getDisplayDevice(uint dev_num);
-  bool checkAndSyncCdClient();
+  bool makeProfileFromIccDefault(CdIcc icc_file, uint display_device_id);
+  std::optional<CdIcc> createIccFromEdid(std::filesystem::path edid_file_path);
+
   int mem_fd_; /*!< file descriptor for the icc file */
   std::filesystem::path mem_fd_path_;
   CdClient cd_client_;
