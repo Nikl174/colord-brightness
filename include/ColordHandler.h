@@ -27,6 +27,7 @@ public:
   ColordHandler(std::filesystem::path path_for_icc) noexcept(false);
   // bool setDefaultProfile(std::filesystem::path edid_file_path, uint display_device_id = 0);
   bool setIccFromCmsProfile(cmsHPROFILE profile, uint display_device_id = 0);
+  bool cancelCurrentAction();
   virtual ~ColordHandler();
 
 protected:
@@ -37,7 +38,7 @@ protected:
   int _mem_fd; /*!< file descriptor for the icc file */
   std::filesystem::path _mem_fd_path;
   CdClient _cd_client;
-  GCancellable _cancle_request; /*!< for future cancellation, currently unused*/
+  GCancellable _cancel_request; /*!< for future cancellation, currently unused*/
 };
 
 #endif /* end of include guard: COLORDHANDLER_H */

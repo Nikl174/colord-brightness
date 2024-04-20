@@ -9,12 +9,12 @@
 #include <system_error>
 
 ColordHandler::ColordHandler(std::filesystem::path path_for_icc)
-    : _cancle_request(*g_cancellable_new()), _cd_client(*cd_client_new()) {
+    : _cancel_request(*g_cancellable_new()), _cd_client(*cd_client_new()) {
 
   // connect client
   if (cd_client_get_has_server(&_cd_client)) {
     std::unique_ptr<GError *> error;
-    if (!cd_client_connect_sync(&_cd_client, &_cancle_request, error.get())) {
+    if (!cd_client_connect_sync(&_cd_client, &_cancel_request, error.get())) {
       // client not connected, can be fixed
       LOG(WARNING) << "Couldn't connect colord client on init! Gerror: "
                    << (**error).message;
@@ -39,7 +39,7 @@ ColordHandler::ColordHandler(std::filesystem::path path_for_icc)
 std::optional<CdDevice> ColordHandler::getDisplayDevice(uint dev_num) {
   std::unique_ptr<GError *> error;
   GPtrArray *devices = cd_client_get_devices_by_kind_sync(
-      &_cd_client, CD_DEVICE_KIND_DISPLAY, &_cancle_request, error.get());
+      &_cd_client, CD_DEVICE_KIND_DISPLAY, &_cancel_request, error.get());
   gpointer dev = devices->pdata[dev_num];
   if (dev)
     return *static_cast<CdDevice *>(dev);
@@ -81,7 +81,7 @@ bool ColordHandler::makeProfileFromIccDefault(CdIcc icc_file,
     std::unique_ptr<GError *> error;
     CdProfile *tmp_profile = cd_client_create_profile_for_icc_sync(
         &_cd_client, &icc_file, CdObjectScope::CD_OBJECT_SCOPE_TEMP,
-        &_cancle_request, error.get());
+        &_cancel_request, error.get());
     if (!tmp_profile) {
       LOG(ERROR) << "CdClient couldn't create a Profile from icc file! Gerror: "
                  << (**error).message;
@@ -93,7 +93,7 @@ bool ColordHandler::makeProfileFromIccDefault(CdIcc icc_file,
 
   if (!cd_client_get_connected(&_cd_client)) {
     std::unique_ptr<GError *> error;
-    if (!cd_client_connect_sync(&_cd_client, &_cancle_request, error.get())) {
+    if (!cd_client_connect_sync(&_cd_client, &_cancel_request, error.get())) {
       // client not connected
       LOG(ERROR)
           << "Couldn't connect Colord client on setting a profile! Gerror: "
@@ -109,7 +109,7 @@ bool ColordHandler::makeProfileFromIccDefault(CdIcc icc_file,
 
   {
     std::unique_ptr<GError *> error;
-    if (!cd_device_connect_sync(&cd_display.value(), &_cancle_request,
+    if (!cd_device_connect_sync(&cd_display.value(), &_cancel_request,
                                 error.get())) {
       LOG(ERROR) << "Couldn't connect to CdDevice! Gerror: "
                  << (**error).message;
@@ -121,7 +121,7 @@ bool ColordHandler::makeProfileFromIccDefault(CdIcc icc_file,
     std::unique_ptr<GError *> error;
     if (!cd_device_add_profile_sync(&cd_display.value(),
                                     CD_DEVICE_RELATION_SOFT, &icc_profile,
-                                    &_cancle_request, error.get())) {
+                                    &_cancel_request, error.get())) {
       LOG(ERROR) << "Couldn't add Profile to device! Gerror: "
                  << (**error).message;
       return false;
@@ -130,7 +130,7 @@ bool ColordHandler::makeProfileFromIccDefault(CdIcc icc_file,
 
   std::unique_ptr<GError *> error;
   auto set_profile = cd_device_make_profile_default_sync(
-      &cd_display.value(), &icc_profile, &_cancle_request, error.get());
+      &cd_display.value(), &icc_profile, &_cancel_request, error.get());
   LOG_IF(!set_profile, ERROR)
       << "Couldn't make profile default for device! Gerror: "
       << (**error).message;
@@ -190,3 +190,14 @@ ColordHandler::createIccFromEdid(std::filesystem::path edid_file_path) {
   return icc;
 }
 
+bool ColordHandler::cancelCurrentAction() {
+  g_cancellable_cancel(&_cancel_request);
+  return g_cancellable_is_cancelled(&_cancel_request);
+}
+
+ColordHandler::~ColordHandler() {
+  if (!g_cancellable_is_cancelled(&_cancel_request)) {
+    cancelCurrentAction();
+  }
+  close(_mem_fd);
+}
