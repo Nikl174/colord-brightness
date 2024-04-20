@@ -1,4 +1,5 @@
 #include "ColordHandler.h"
+#include <cstdio>
 #include <easylogging++.h>
 #include <filesystem>
 #include <lcms2.h>
@@ -8,16 +9,35 @@
 #include <sys/mman.h>
 #include <system_error>
 
+/*! TODO: is it possible with only one fd??
+ *  \todo is it possible with only one fd??
+ */
+bool ColordHandler::resetMemFd() {
+  auto file = fopen(_mem_fd_path.c_str(), "w");
+  if (!file) {
+    // make new fd
+    _mem_fd = memfd_create(_icc_path.c_str(), 0);
+    std::stringstream sa;
+    sa << "/proc/" << getpid() << "/fd/" << _mem_fd;
+    _mem_fd_path = std::filesystem::path(sa.str());
+    LOG(DEBUG) << "New Filedescriptor path: " << _mem_fd_path;
+  }
+  // fclose(file);
+  return _mem_fd < 0;
+}
+
 ColordHandler::ColordHandler(std::filesystem::path path_for_icc)
-    : _cancel_request(*g_cancellable_new()), _cd_client(*cd_client_new()) {
+    : _cancel_request(g_cancellable_new()), _cd_client(cd_client_new()),
+      _icc_path(path_for_icc) {
 
   // connect client
-  if (cd_client_get_has_server(&_cd_client)) {
-    std::unique_ptr<GError *> error;
-    if (!cd_client_connect_sync(&_cd_client, &_cancel_request, error.get())) {
+  if (cd_client_get_has_server(_cd_client.get())) {
+    GError *error = NULL;
+    if (!cd_client_connect_sync(_cd_client.get(), _cancel_request.get(),
+                                &error)) {
       // client not connected, can be fixed
       LOG(WARNING) << "Couldn't connect colord client on init! Gerror: "
-                   << (**error).message;
+                   << error->message;
     }
   } else {
     // Colord-Server not running, object would be useless
@@ -25,7 +45,7 @@ ColordHandler::ColordHandler(std::filesystem::path path_for_icc)
   }
 
   // open memfd, set close on exit (e.g.: closes fd, if process crashes)
-  _mem_fd = memfd_create(path_for_icc.c_str(), MFD_CLOEXEC);
+  _mem_fd = memfd_create(path_for_icc.c_str(), 0);
   if (_mem_fd < 0) {
     // file Couldn't get created, object Couldn't write the profile
     throw std::system_error(errno, std::system_category());
@@ -33,17 +53,18 @@ ColordHandler::ColordHandler(std::filesystem::path path_for_icc)
     std::stringstream sa;
     sa << "/proc/" << getpid() << "/fd/" << _mem_fd;
     _mem_fd_path = std::filesystem::path(sa.str());
+    LOG(DEBUG) << "Filedescriptor path: " << _mem_fd_path;
   }
 }
 
-std::optional<CdDevice> ColordHandler::getDisplayDevice(uint dev_num) {
-  std::unique_ptr<GError *> error;
+std::optional<CdDevice *> ColordHandler::getDisplayDevice(uint dev_num) {
+  GError *error = NULL;
   GPtrArray *devices = cd_client_get_devices_by_kind_sync(
-      &_cd_client, CD_DEVICE_KIND_DISPLAY, &_cancel_request, error.get());
+      _cd_client.get(), CD_DEVICE_KIND_DISPLAY, _cancel_request.get(), &error);
   gpointer dev = devices->pdata[dev_num];
   if (dev)
-    return *static_cast<CdDevice *>(dev);
-  LOG(ERROR) << "No Display device found! Gerror: " << (**error).message;
+    return static_cast<CdDevice *>(dev);
+  LOG(ERROR) << "No Display device found! Gerror: " << error->message;
   return std::nullopt;
 }
 
@@ -52,6 +73,8 @@ std::optional<CdDevice> ColordHandler::getDisplayDevice(uint dev_num) {
  */
 bool ColordHandler::setIccFromCmsProfile(cmsHPROFILE profile,
                                          uint display_device_id) {
+  LOG_IF(resetMemFd(), WARNING) << "Couldn't clear file deskriptor content.";
+
   if (!cmsMD5computeID(profile))
     LOG(WARNING) << "Couldn't recompute hash for lcms2 color profile!";
 
@@ -60,91 +83,92 @@ bool ColordHandler::setIccFromCmsProfile(cmsHPROFILE profile,
     return false;
   }
 
-  CdIcc icc_file = *cd_icc_new();
+  CdIcc *icc_file;
   {
-    std::unique_ptr<GError *> error;
-    if (!cd_icc_load_fd(&icc_file, _mem_fd, CD_ICC_LOAD_FLAGS_ALL,
-                        error.get())) {
+    CdIcc *icc = cd_icc_new();
+    GError *error = NULL;
+    if (!cd_icc_load_fd(icc, _mem_fd, CD_ICC_LOAD_FLAGS_ALL, &error)) {
       LOG(ERROR) << "CdIcc profile couldn't get loaded from mem_fd! Gerror: "
-                 << (**error).message;
+                 << error->message;
       return false;
     }
+    cd_icc_set_filename(icc, _mem_fd_path.c_str());
+    icc_file = icc;
   }
 
+  // LOG(DEBUG) << "Icc-content: \n" << cd_icc_to_string(icc_file);
   return makeProfileFromIccDefault(icc_file, display_device_id);
 }
 
-bool ColordHandler::makeProfileFromIccDefault(CdIcc icc_file,
+bool ColordHandler::makeProfileFromIccDefault(CdIcc *icc_file,
                                               uint display_device_id) {
-  CdProfile icc_profile = *cd_profile_new();
+  CdProfile *icc_profile;
   {
-    std::unique_ptr<GError *> error;
+    GError *error = NULL;
     CdProfile *tmp_profile = cd_client_create_profile_for_icc_sync(
-        &_cd_client, &icc_file, CdObjectScope::CD_OBJECT_SCOPE_TEMP,
-        &_cancel_request, error.get());
+        _cd_client.get(), icc_file, CdObjectScope::CD_OBJECT_SCOPE_TEMP,
+        _cancel_request.get(), &error);
     if (!tmp_profile) {
-      LOG(ERROR) << "CdClient couldn't create a Profile from icc file! Gerror: "
-                 << (**error).message;
+      LOG(ERROR) << "CdClient couldn't create a Profile from icc file, '"
+                 << tmp_profile << "'! Gerror: " << error->message;
       return false;
     } else {
-      icc_profile = *tmp_profile;
+      icc_profile = tmp_profile;
     }
   }
 
-  if (!cd_client_get_connected(&_cd_client)) {
-    std::unique_ptr<GError *> error;
-    if (!cd_client_connect_sync(&_cd_client, &_cancel_request, error.get())) {
+  if (!cd_client_get_connected(_cd_client.get())) {
+    GError *error = NULL;
+    if (!cd_client_connect_sync(_cd_client.get(), _cancel_request.get(),
+                                &error)) {
       // client not connected
       LOG(ERROR)
           << "Couldn't connect Colord client on setting a profile! Gerror: "
-          << (**error).message;
+          << error->message;
       return false;
     }
   }
 
-  std::optional<CdDevice> cd_display = getDisplayDevice(display_device_id);
+  std::optional<CdDevice *> cd_display = getDisplayDevice(display_device_id);
   if (!cd_display.has_value())
-
     return false;
+  CdDevice *display = cd_display.value();
 
   {
-    std::unique_ptr<GError *> error;
-    if (!cd_device_connect_sync(&cd_display.value(), &_cancel_request,
-                                error.get())) {
-      LOG(ERROR) << "Couldn't connect to CdDevice! Gerror: "
-                 << (**error).message;
+    GError *error = NULL;
+    if (!cd_device_connect_sync(display, _cancel_request.get(), &error)) {
+      LOG(ERROR) << "Couldn't connect to CdDevice! Gerror: " << error->message;
       return false;
     }
   }
 
   {
-    std::unique_ptr<GError *> error;
-    if (!cd_device_add_profile_sync(&cd_display.value(),
-                                    CD_DEVICE_RELATION_SOFT, &icc_profile,
-                                    &_cancel_request, error.get())) {
+    GError *error = NULL;
+    if (!cd_device_add_profile_sync(display, CD_DEVICE_RELATION_SOFT,
+                                    icc_profile, _cancel_request.get(),
+                                    &error)) {
       LOG(ERROR) << "Couldn't add Profile to device! Gerror: "
-                 << (**error).message;
+                 << error->message;
       return false;
     }
   }
 
-  std::unique_ptr<GError *> error;
+  GError *error = NULL;
   auto set_profile = cd_device_make_profile_default_sync(
-      &cd_display.value(), &icc_profile, &_cancel_request, error.get());
+      display, icc_profile, _cancel_request.get(), &error);
   LOG_IF(!set_profile, ERROR)
-      << "Couldn't make profile default for device! Gerror: "
-      << (**error).message;
+      << "Couldn't make profile default for device! Gerror: " << error->message;
   return set_profile;
 }
 
-std::stringstream print_color(const CdColorYxy *color) {
+std::string print_color(const CdColorYxy *color) {
   std::stringstream ss;
   if (color != nullptr) {
     ss << " Y: " << color->Y << " x:" << color->x << " y:" << color->y;
   } else {
     ss << "NULLPTR";
   }
-  return ss;
+  return ss.str();
 }
 
 std::optional<CdIcc>
@@ -156,11 +180,11 @@ ColordHandler::createIccFromEdid(std::filesystem::path edid_file_path) {
   char bytes[128];
   edid_file.read(&bytes[0], 128);
   {
-    std::unique_ptr<GError *> error;
+    GError *error = NULL;
     gboolean parsed =
-        cd_edid_parse(monitor, g_bytes_new(bytes, sizeof(bytes)), error.get());
+        cd_edid_parse(monitor, g_bytes_new(bytes, sizeof(bytes)), &error);
     if (!parsed) {
-      LOG(ERROR) << "Edid couldn't ger parsed! Gerror: " << (**error).message;
+      LOG(ERROR) << "Edid couldn't ger parsed! Gerror: " << error->message;
       return std::nullopt;
     }
   }
@@ -178,12 +202,12 @@ ColordHandler::createIccFromEdid(std::filesystem::path edid_file_path) {
 
   CdIcc icc = *cd_icc_new();
   {
-    std::unique_ptr<GError *> error;
+    GError *error = NULL;
     gboolean created = cd_icc_create_from_edid(&icc, m_gamma, m_red, m_green,
-                                               m_blue, m_white, error.get());
+                                               m_blue, m_white, &error);
     if (!created) {
       LOG(ERROR) << "Couldn't create icc file form edid values! Gerror: "
-                 << (**error).message;
+                 << error->message;
     }
   }
 
@@ -191,12 +215,12 @@ ColordHandler::createIccFromEdid(std::filesystem::path edid_file_path) {
 }
 
 bool ColordHandler::cancelCurrentAction() {
-  g_cancellable_cancel(&_cancel_request);
-  return g_cancellable_is_cancelled(&_cancel_request);
+  g_cancellable_cancel(_cancel_request.get());
+  return g_cancellable_is_cancelled(_cancel_request.get());
 }
 
 ColordHandler::~ColordHandler() {
-  if (!g_cancellable_is_cancelled(&_cancel_request)) {
+  if (!g_cancellable_is_cancelled(_cancel_request.get())) {
     cancelCurrentAction();
   }
   close(_mem_fd);

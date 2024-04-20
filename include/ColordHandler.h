@@ -25,20 +25,24 @@ public:
    *  \throws std::runtime_error::system_error if the fd couldn't get created
    */
   ColordHandler(std::filesystem::path path_for_icc) noexcept(false);
-  // bool setDefaultProfile(std::filesystem::path edid_file_path, uint display_device_id = 0);
+  // bool setDefaultProfile(std::filesystem::path edid_file_path, uint
+  // display_device_id = 0);
   bool setIccFromCmsProfile(cmsHPROFILE profile, uint display_device_id = 0);
   bool cancelCurrentAction();
   virtual ~ColordHandler();
 
 protected:
-  std::optional<CdDevice> getDisplayDevice(uint dev_num);
-  bool makeProfileFromIccDefault(CdIcc icc_file, uint display_device_id);
+  std::optional<CdDevice *> getDisplayDevice(uint dev_num);
+  bool makeProfileFromIccDefault(CdIcc *icc_file, uint display_device_id);
   std::optional<CdIcc> createIccFromEdid(std::filesystem::path edid_file_path);
+  bool resetMemFd();
 
   int _mem_fd; /*!< file descriptor for the icc file */
   std::filesystem::path _mem_fd_path;
-  CdClient _cd_client;
-  GCancellable _cancel_request; /*!< for future cancellation, currently unused*/
+  std::filesystem::path _icc_path;
+  std::shared_ptr<CdClient> _cd_client;
+  std::shared_ptr<GCancellable>
+      _cancel_request; /*!< for future cancellation, currently unused*/
 };
 
 #endif /* end of include guard: COLORDHANDLER_H */

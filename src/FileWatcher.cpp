@@ -112,7 +112,7 @@ FileWatcher::FileWatcher(std::filesystem::path file)
   /*! TODO: throw exeception or transfer to startWatching and propagate error?
    *  \todo throw exeception or transfer to startWatching and propagate error?
    */
-  LOG_IF(sigaction(SIGINT, &sa, NULL) != 0, WARNING)
+  LOG_IF(sigaction(SIGUSR1, &sa, NULL) != 0, WARNING)
       << "Signal Handler for 'SIGINT' couldn't register, errno: "
       << strerror(errno);
 }
@@ -218,7 +218,7 @@ bool FileWatcher::stopWatching() {
   if (_watching_thread.joinable()) {
     // send a signal to stop the reading for the fd/waiting for a file
     // modification if needed
-    int send_sig = pthread_kill(_watching_thread.native_handle(), SIGINT);
+    int send_sig = pthread_kill(_watching_thread.native_handle(), SIGUSR1);
     if (send_sig != 0) {
       LOG(ERROR) << "Couldnt send signal to thread, errno: " << strerror(errno);
       return false;
