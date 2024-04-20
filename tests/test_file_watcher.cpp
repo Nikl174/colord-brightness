@@ -1,13 +1,14 @@
 #include "FileWatcher.h"
 #include <cassert>
 #include <cstring>
+#include <easylogging++.h>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <future>
 #include <iostream>
 #include <string>
-#include <thread>
+INITIALIZE_EASYLOGGINGPP
 
 int main(int argc, char *argv[]) {
   {

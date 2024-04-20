@@ -139,6 +139,8 @@ int main(int argc, char *argv[]) {
   GError *error = NULL;
 
   CdClient *cd_client = cd_client_new();
+  std::cout << cd_client_get_has_server(cd_client) << std::endl;
+  return 0;
   std::cout << "Client connected: "
             << cd_client_connect_sync(cd_client, NULL, NULL) << std::endl;
 
