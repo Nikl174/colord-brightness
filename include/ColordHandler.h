@@ -5,6 +5,7 @@
 #include <colord.h>
 #include <filesystem>
 #include <lcms2.h>
+#include <memory>
 #include <optional>
 
 /*! \class ColordHandler
@@ -43,6 +44,7 @@ protected:
   std::shared_ptr<CdClient> _cd_client;
   std::shared_ptr<GCancellable>
       _cancel_request; /*!< for future cancellation, currently unused*/
+  CdProfile* _current_profile;
 };
 
 #endif /* end of include guard: COLORDHANDLER_H */

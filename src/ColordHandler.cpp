@@ -29,7 +29,7 @@ bool ColordHandler::resetMemFd() {
 
 ColordHandler::ColordHandler(std::filesystem::path path_for_icc)
     : _cancel_request(g_cancellable_new()), _cd_client(cd_client_new()),
-      _icc_path(path_for_icc) {
+      _icc_path(path_for_icc), _current_profile(nullptr) {
 
   // connect client
   if (cd_client_get_has_server(_cd_client.get())) {
@@ -112,20 +112,6 @@ bool ColordHandler::setIccFromCmsProfile(cmsHPROFILE profile,
 
 bool ColordHandler::makeProfileFromIccDefault(CdIcc *icc_file,
                                               uint display_device_id) {
-  CdProfile *icc_profile;
-  {
-    GError *error = NULL;
-    CdProfile *tmp_profile = cd_client_create_profile_for_icc_sync(
-        _cd_client.get(), icc_file, CdObjectScope::CD_OBJECT_SCOPE_TEMP,
-        _cancel_request.get(), &error);
-    if (!tmp_profile) {
-      LOG(ERROR) << "CdClient couldn't create a Profile from icc file, '"
-                 << tmp_profile << "'! Gerror: " << error->message;
-      return false;
-    } else {
-      icc_profile = tmp_profile;
-    }
-  }
 
   if (!cd_client_get_connected(_cd_client.get())) {
     GError *error = NULL;
@@ -140,8 +126,10 @@ bool ColordHandler::makeProfileFromIccDefault(CdIcc *icc_file,
   }
 
   std::optional<CdDevice *> cd_display = getDisplayDevice(display_device_id);
-  if (!cd_display.has_value())
+  if (!cd_display.has_value()) {
+    LOG(WARNING) << "No display found with id: " << display_device_id;
     return false;
+  }
   CdDevice *display = cd_display.value();
 
   {
@@ -152,20 +140,42 @@ bool ColordHandler::makeProfileFromIccDefault(CdIcc *icc_file,
     }
   }
 
+  CdProfile *tmp_profile = NULL;
+  {
+    GError *error = NULL;
+    tmp_profile = cd_client_create_profile_for_icc_sync(
+        _cd_client.get(), icc_file, CdObjectScope::CD_OBJECT_SCOPE_TEMP,
+        _cancel_request.get(), &error);
+    if (!tmp_profile) {
+      LOG(ERROR) << "CdClient couldn't create a Profile from icc file, '"
+                 << tmp_profile << "'! Gerror: " << error->message;
+      return false;
+    }
+  }
+
   {
     GError *error = NULL;
     if (!cd_device_add_profile_sync(display, CD_DEVICE_RELATION_SOFT,
-                                    icc_profile, _cancel_request.get(),
+                                    tmp_profile, _cancel_request.get(),
                                     &error)) {
       LOG(ERROR) << "Couldn't add Profile to device! Gerror: "
                  << error->message;
       return false;
     }
+    if (_current_profile) {
+      gboolean removed = cd_device_remove_profile_sync(
+          display, _current_profile, _cancel_request.get(), &error);
+      LOG_IF(!removed, WARNING)
+          << "Couldn't remove current profile form device! Gerror: "
+          << error->message;
+    }
+    // delete _current_profile;
+    _current_profile = tmp_profile;
   }
 
   GError *error = NULL;
   auto set_profile = cd_device_make_profile_default_sync(
-      display, icc_profile, _cancel_request.get(), &error);
+      display, _current_profile, _cancel_request.get(), &error);
   LOG_IF(!set_profile, ERROR)
       << "Couldn't make profile default for device! Gerror: " << error->message;
   return set_profile;
