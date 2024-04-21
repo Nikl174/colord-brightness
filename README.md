@@ -2,6 +2,14 @@
 use ICC color profiles to change the brightness of the display
 inspired by [icc-brightness](https://github.com/udifuchs/icc-brightness)
 
+## Todo
+- add commandline interface
+- add config file?
+- add AUR package
+- add systemd-user-script
+- improve structure
+- improve readme
+
 ## workarround for icc file
 - for a icc profile (which is needed for a setting it system wide) a file need to be saved some ware -> read/write in the slow SSD 
 - as a work arround, 2 solutions:
