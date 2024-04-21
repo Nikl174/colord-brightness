@@ -16,11 +16,12 @@ bool ColordHandler::resetMemFd() {
   auto file = fopen(_mem_fd_path.c_str(), "w");
   if (!file) {
     // make new fd
-    _mem_fd = memfd_create(_icc_path.c_str(), 0);
-    std::stringstream sa;
-    sa << "/proc/" << getpid() << "/fd/" << _mem_fd;
-    _mem_fd_path = std::filesystem::path(sa.str());
-    LOG(DEBUG) << "New Filedescriptor path: " << _mem_fd_path;
+    // _mem_fd = memfd_create(_icc_path.c_str(), 0);
+    // std::stringstream sa;
+    // sa << "/proc/" << getpid() << "/fd/" << _mem_fd;
+    // _mem_fd_path = std::filesystem::path(sa.str());
+    // LOG(DEBUG) << "New Filedescriptor path: " << _mem_fd_path;
+    return false;
   }
   // fclose(file);
   return _mem_fd < 0;
@@ -28,7 +29,7 @@ bool ColordHandler::resetMemFd() {
 
 ColordHandler::ColordHandler(std::filesystem::path path_for_icc)
     : _cancel_request(g_cancellable_new()), _cd_client(cd_client_new()),
-      _icc_path(path_for_icc) {
+      _icc_path(path_for_icc), _current_profile(nullptr) {
 
   // connect client
   if (cd_client_get_has_server(_cd_client.get())) {
@@ -45,7 +46,7 @@ ColordHandler::ColordHandler(std::filesystem::path path_for_icc)
   }
 
   // open memfd, set close on exit (e.g.: closes fd, if process crashes)
-  _mem_fd = memfd_create(path_for_icc.c_str(), 0);
+  _mem_fd = memfd_create(path_for_icc.c_str(), MFD_CLOEXEC);
   if (_mem_fd < 0) {
     // file Couldn't get created, object Couldn't write the profile
     throw std::system_error(errno, std::system_category());
@@ -78,20 +79,29 @@ bool ColordHandler::setIccFromCmsProfile(cmsHPROFILE profile,
   if (!cmsMD5computeID(profile))
     LOG(WARNING) << "Couldn't recompute hash for lcms2 color profile!";
 
-  if (!cmsSaveProfileToFile(profile, _mem_fd_path.c_str())) {
-    LOG(ERROR) << "Lcms2-profile Couldn't get saved into mem_fd!";
-    return false;
-  }
+  // if (!cmsSaveProfileToFile(profile, _mem_fd_path.c_str())) {
+  //   LOG(ERROR) << "Lcms2-profile Couldn't get saved into mem_fd!";
+  //   return false;
+  // }
 
   CdIcc *icc_file;
   {
     CdIcc *icc = cd_icc_new();
     GError *error = NULL;
-    if (!cd_icc_load_fd(icc, _mem_fd, CD_ICC_LOAD_FLAGS_ALL, &error)) {
-      LOG(ERROR) << "CdIcc profile couldn't get loaded from mem_fd! Gerror: "
+    // if (!cd_icc_load_fd(icc, _mem_fd, CD_ICC_LOAD_FLAGS_ALL, &error)) {
+    //   LOG(ERROR) << "CdIcc profile couldn't get loaded from mem_fd! Gerror: "
+    //              << error->message;
+    //   return false;
+    // }
+    if (!cd_icc_load_handle(icc, profile, CD_ICC_LOAD_FLAGS_ALL, &error)) {
+      LOG(ERROR) << "CdIcc profile couldn't get loaded from Handle! Gerror: "
                  << error->message;
       return false;
     }
+    GFile *file = g_file_new_for_path(_mem_fd_path.c_str());
+    auto saved = cd_icc_save_file(icc, file, CD_ICC_SAVE_FLAGS_NONE,
+                                  _cancel_request.get(), &error);
+    LOG_IF(!saved, ERROR) << "Icc file not saved!";
     cd_icc_set_filename(icc, _mem_fd_path.c_str());
     icc_file = icc;
   }
@@ -102,20 +112,6 @@ bool ColordHandler::setIccFromCmsProfile(cmsHPROFILE profile,
 
 bool ColordHandler::makeProfileFromIccDefault(CdIcc *icc_file,
                                               uint display_device_id) {
-  CdProfile *icc_profile;
-  {
-    GError *error = NULL;
-    CdProfile *tmp_profile = cd_client_create_profile_for_icc_sync(
-        _cd_client.get(), icc_file, CdObjectScope::CD_OBJECT_SCOPE_TEMP,
-        _cancel_request.get(), &error);
-    if (!tmp_profile) {
-      LOG(ERROR) << "CdClient couldn't create a Profile from icc file, '"
-                 << tmp_profile << "'! Gerror: " << error->message;
-      return false;
-    } else {
-      icc_profile = tmp_profile;
-    }
-  }
 
   if (!cd_client_get_connected(_cd_client.get())) {
     GError *error = NULL;
@@ -130,8 +126,10 @@ bool ColordHandler::makeProfileFromIccDefault(CdIcc *icc_file,
   }
 
   std::optional<CdDevice *> cd_display = getDisplayDevice(display_device_id);
-  if (!cd_display.has_value())
+  if (!cd_display.has_value()) {
+    LOG(WARNING) << "No display found with id: " << display_device_id;
     return false;
+  }
   CdDevice *display = cd_display.value();
 
   {
@@ -142,20 +140,42 @@ bool ColordHandler::makeProfileFromIccDefault(CdIcc *icc_file,
     }
   }
 
+  CdProfile *tmp_profile = NULL;
+  {
+    GError *error = NULL;
+    tmp_profile = cd_client_create_profile_for_icc_sync(
+        _cd_client.get(), icc_file, CdObjectScope::CD_OBJECT_SCOPE_TEMP,
+        _cancel_request.get(), &error);
+    if (!tmp_profile) {
+      LOG(ERROR) << "CdClient couldn't create a Profile from icc file, '"
+                 << tmp_profile << "'! Gerror: " << error->message;
+      return false;
+    }
+  }
+
   {
     GError *error = NULL;
     if (!cd_device_add_profile_sync(display, CD_DEVICE_RELATION_SOFT,
-                                    icc_profile, _cancel_request.get(),
+                                    tmp_profile, _cancel_request.get(),
                                     &error)) {
       LOG(ERROR) << "Couldn't add Profile to device! Gerror: "
                  << error->message;
       return false;
     }
+    if (_current_profile) {
+      gboolean removed = cd_device_remove_profile_sync(
+          display, _current_profile, _cancel_request.get(), &error);
+      LOG_IF(!removed, WARNING)
+          << "Couldn't remove current profile form device! Gerror: "
+          << error->message;
+    }
+    // delete _current_profile;
+    _current_profile = tmp_profile;
   }
 
   GError *error = NULL;
   auto set_profile = cd_device_make_profile_default_sync(
-      display, icc_profile, _cancel_request.get(), &error);
+      display, _current_profile, _cancel_request.get(), &error);
   LOG_IF(!set_profile, ERROR)
       << "Couldn't make profile default for device! Gerror: " << error->message;
   return set_profile;

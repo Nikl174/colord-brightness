@@ -4,12 +4,14 @@
 #include <cassert>
 #include <cctype>
 #include <climits>
+#include <cstddef>
 #include <easylogging++.h>
 #include <exception>
 #include <filesystem>
 #include <lcms2.h>
 #include <memory>
 #include <string>
+#include <thread>
 
 INITIALIZE_EASYLOGGINGPP
 #define ELPP_LOGGING_FLAGS_FROM_ARGS
@@ -20,7 +22,9 @@ INITIALIZE_EASYLOGGINGPP
 // based on color profile creation from:
 // https://github.com/udifuchs/icc-brightness/blob/master/icc-brightness-gen.c
 cmsHPROFILE create_srgb_profile(double brightness) {
-  cmsHPROFILE hsRGB = cmsCreate_sRGBProfile();
+  // cmsHPROFILE hsRGB = cmsCreate_sRGBProfile();
+  cmsContext ctx = cmsCreateContext(NULL, NULL);
+  cmsHPROFILE hsRGB = cmsCreate_sRGBProfileTHR(ctx);
 
   cmsMLU *mlu = cmsMLUalloc(NULL, 1);
   char description[20];
@@ -108,6 +112,12 @@ void startWatchAndApplyBrightness(std::shared_ptr<ColordHandler> cd_handle,
 
 int main(int argc, char *argv[]) {
   START_EASYLOGGINGPP(argc, argv);
+  el::Configurations default_conf;
+  default_conf.setToDefault();
+  default_conf.set(el::Level::Global, el::ConfigurationType::Enabled, "false");
+  default_conf.setGlobally(el::ConfigurationType::Format,
+                           "%datetime %level %msg");
+  el::Loggers::reconfigureLogger("default", default_conf);
 
   struct ColordBrightnessConfig {
     std::filesystem::path icc_file;
