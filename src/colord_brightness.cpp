@@ -114,10 +114,10 @@ int main(int argc, char *argv[]) {
   START_EASYLOGGINGPP(argc, argv);
   el::Configurations default_conf;
   default_conf.setToDefault();
-  default_conf.set(el::Level::Global, el::ConfigurationType::Enabled, "false");
+  default_conf.set(el::Level::Warning, el::ConfigurationType::Enabled, "false");
   default_conf.setGlobally(el::ConfigurationType::Format,
                            "%datetime %level %msg");
-  el::Loggers::reconfigureLogger("default", default_conf);
+  el::Loggers::reconfigureAllLoggers(default_conf);
 
   struct ColordBrightnessConfig {
     std::filesystem::path icc_file;
