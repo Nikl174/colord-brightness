@@ -11,7 +11,6 @@
 #include <lcms2.h>
 #include <memory>
 #include <string>
-#include <thread>
 
 INITIALIZE_EASYLOGGINGPP
 #define ELPP_LOGGING_FLAGS_FROM_ARGS
@@ -82,7 +81,8 @@ void startWatchAndApplyBrightness(std::shared_ptr<ColordHandler> cd_handle,
   assert(fw->startWatching() == file_watch_error::error_still_watching);
   // fw started
 
-  while (std::optional<std::string> new_brightness = fw->waitAndGet()) {
+  std::optional<std::string> new_brightness = fw->readFile();
+  do {
     if (new_brightness.has_value()) {
       std::string brightness_str = new_brightness.value();
       int end = brightness_str.length() - 1;
@@ -107,7 +107,7 @@ void startWatchAndApplyBrightness(std::shared_ptr<ColordHandler> cd_handle,
     } else {
       LOG(WARNING) << "Error retreiving brightness value from filewatcher!";
     }
-  }
+  } while ((new_brightness = fw->waitAndGet()));
 }
 
 int main(int argc, char *argv[]) {
@@ -158,7 +158,4 @@ int main(int argc, char *argv[]) {
   max_brightness_file.read(max_brightness, sizeof(max_brightness));
 
   startWatchAndApplyBrightness(cd_handle, fw, std::stod(max_brightness));
-  // std::thread t(&startWatchAndApplyBrightness, cd_handle, fw,
-  //               std::stod(max_brightness));
-  // t.join();
 }

@@ -2,7 +2,6 @@
 #include <atomic>
 #include <cerrno>
 #include <condition_variable>
-#include <csignal>
 #include <cstring>
 #include <easylogging++.h>
 #include <filesystem>
@@ -23,6 +22,25 @@
 #include <unistd.h>
 
 // -----------------Helper  functions----------------
+
+std::optional<std::string> getFileContent(std::filesystem::path file_path) {
+  std::ifstream file(file_path);
+  if (file.is_open()) {
+    char c;
+    std::stringstream ss;
+    while (file.get(c)) {
+      ss << c;
+    }
+    file.close();
+    LOG(DEBUG) << "Read file content: " << ss;
+    return ss.str();
+  } else {
+    LOG(DEBUG) << "Couldn't open the file " << file_path
+               << ", errno:" << strerror(errno);
+  }
+  return std::nullopt;
+}
+
 void sig_int_handler(int sig) {
   LOG(DEBUG) << "Received sig: " << sig
              << " in thread: " << std::this_thread::get_id();
@@ -32,19 +50,12 @@ bool updateFileContent(std::shared_ptr<std::mutex> mut,
                        std::filesystem::path file_path,
                        std::shared_ptr<std::string> changed_file_content) {
   std::lock_guard<std::mutex> lk(*mut);
-  std::ifstream file(file_path);
-  if (file.is_open()) {
-    char c;
-    std::stringstream ss;
-    while (file.get(c)) {
-      ss << c;
-    }
-    file.close();
-    *changed_file_content = ss.str();
-    LOG(DEBUG) << "File content updated to: " << ss.str();
+  if (std::optional<std::string> content = getFileContent(file_path)) {
+    *changed_file_content = content.value();
+    LOG(DEBUG) << "File content updated to: " << content;
     return true;
   } else {
-    LOG(WARNING) << "Couldn't update file content because file was not open!";
+    LOG(WARNING) << "Couldn't update file content!";
     return false;
   }
 }
@@ -96,7 +107,7 @@ FileWatcher::FileWatcher(std::filesystem::path file)
       _changed_file_content(std::make_shared<std::string>("")), _watch_fd(-1) {
 
   if (!std::filesystem::exists(file)) {
-      throw std::runtime_error("File does not exist!");
+    throw std::runtime_error("File does not exist!");
   }
   _inotify_fd = inotify_init();
   if (_inotify_fd == -1) {
@@ -239,4 +250,8 @@ FileWatcher::~FileWatcher() {
   };
   LOG_IF(close(_inotify_fd) != 0, ERROR)
       << "Couldnt close inotify fd, errno: " << strerror(errno);
+}
+
+std::optional<std::string> FileWatcher::readFile() {
+  return getFileContent(_file_to_watch);
 }

@@ -64,7 +64,11 @@ public:
   template <class Rep, class Period>
   std::optional<std::string>
   waitForAndGet(std::chrono::duration<Rep, Period> time);
+
+  std::optional<std::string> readFile();
+
   bool stopWatching();
+
   virtual ~FileWatcher();
 
 protected:
