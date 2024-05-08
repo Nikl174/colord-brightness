@@ -1,6 +1,7 @@
 # ICC Color Brightness WIP
 use ICC color profiles to change the brightness of the display
 inspired by [icc-brightness](https://github.com/udifuchs/icc-brightness) but more performant and does not produces ICC files in local directory
+> NOTE: currently only **intel_backlight** is used for backlight change
 
 ## Installation
 ```bash
