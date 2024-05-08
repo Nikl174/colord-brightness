@@ -43,14 +43,12 @@ target_link_libraries(test_file_watcher file_watcher Easyloggigpp)
 target_include_directories(test_file_watcher PUBLIC ${INCLUDE_DIR})
 add_test(NAME test_file_watcher COMMAND test_file_watcher)
 
-add_executable(colord_brightness)
-target_sources(colord_brightness PRIVATE ${SRC_DIR}/colord_brightness.cpp)
+add_executable(colord-brightness)
+target_sources(colord-brightness PRIVATE ${SRC_DIR}/colord_brightness.cpp)
 target_include_directories(
-  colord_brightness PUBLIC ${INCLUDE_DIR} ${COLORD_INCLUDE_DIRS}
+  colord-brightness PUBLIC ${INCLUDE_DIR} ${COLORD_INCLUDE_DIRS}
                            ${LCMS2_INCLUDE_DIRS})
-target_link_libraries(colord_brightness file_watcher colord_handler
+target_link_libraries(colord-brightness file_watcher colord_handler
                       ${COLORD_LIBRARIES} ${LCMS2_LIBRARIES} Easyloggigpp)
 
-# add_executable(poc_test tests/test.cpp) target_link_libraries(poc_test
-# ${COLORD_LIBRARIES} ${LCMS2_LIBRARIES}) target_include_directories(poc_test
-# PUBLIC ${COLORD_INCLUDE_DIRS} ${LCMS2_INCLUDE_DIRS})
+

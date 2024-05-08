@@ -1,0 +1,10 @@
+[Unit]
+Description=Adjust the brightness with colord and icc files
+
+[Service]
+Type=simple
+ExecStart=colord-brightness
+Restart=on-failure
+RestartSec=1s
+RestartSteps=1
+RestartMaxDelaySec=2s
