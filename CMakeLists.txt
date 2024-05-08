@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.5)
 project(
   colord-brightness
-  VERSION 0.1.0
+  VERSION 1.0.0
   LANGUAGES CXX)
 include(CTest)
+include(GNUInstallDirs)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -46,9 +47,11 @@ add_test(NAME test_file_watcher COMMAND test_file_watcher)
 add_executable(colord-brightness)
 target_sources(colord-brightness PRIVATE ${SRC_DIR}/colord_brightness.cpp)
 target_include_directories(
-  colord-brightness PUBLIC ${INCLUDE_DIR} ${COLORD_INCLUDE_DIRS}
-                           ${LCMS2_INCLUDE_DIRS})
+  colord-brightness
+  PUBLIC $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR} ${COLORD_INCLUDE_DIRS}
+         ${LCMS2_INCLUDE_DIRS}
+  PRIVATE ${SRC_DIR})
 target_link_libraries(colord-brightness file_watcher colord_handler
                       ${COLORD_LIBRARIES} ${LCMS2_LIBRARIES} Easyloggigpp)
 
-
+install(TARGETS colord-brightness RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
