@@ -2,6 +2,16 @@
 use ICC color profiles to change the brightness of the display
 inspired by [icc-brightness](https://github.com/udifuchs/icc-brightness) but more performant and does not produces ICC files in local directory
 
+## Installation
+```bash
+mkdir build && cd build
+cmake ..
+make install
+```
+### Archlinux
+- [aur-package](https://aur.archlinux.org/packages/colord-brightness)
+
+
 ## Dependencies
 ```bash
 colord
