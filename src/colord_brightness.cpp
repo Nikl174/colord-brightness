@@ -112,9 +112,11 @@ void startWatchAndApplyBrightness(std::shared_ptr<ColordHandler> cd_handle,
 
 int main(int argc, char *argv[]) {
   START_EASYLOGGINGPP(argc, argv);
+  el::Loggers::addFlag(el::LoggingFlag::HierarchicalLogging);
+  el::Loggers::setLoggingLevel(el::Level::Warning);
+
   el::Configurations default_conf;
   default_conf.setToDefault();
-  default_conf.set(el::Level::Warning, el::ConfigurationType::Enabled, "false");
   default_conf.setGlobally(el::ConfigurationType::Format,
                            "%datetime %level %msg");
   el::Loggers::reconfigureAllLoggers(default_conf);
