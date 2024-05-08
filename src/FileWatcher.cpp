@@ -32,7 +32,7 @@ std::optional<std::string> getFileContent(std::filesystem::path file_path) {
       ss << c;
     }
     file.close();
-    LOG(DEBUG) << "Read file content: " << ss;
+    LOG(DEBUG) << "Read file content: " << ss.str();
     return ss.str();
   } else {
     LOG(DEBUG) << "Couldn't open the file " << file_path
@@ -52,7 +52,7 @@ bool updateFileContent(std::shared_ptr<std::mutex> mut,
   std::lock_guard<std::mutex> lk(*mut);
   if (std::optional<std::string> content = getFileContent(file_path)) {
     *changed_file_content = content.value();
-    LOG(DEBUG) << "File content updated to: " << content;
+    LOG(DEBUG) << "File content updated to: " << *changed_file_content;
     return true;
   } else {
     LOG(WARNING) << "Couldn't update file content!";
