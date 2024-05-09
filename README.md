@@ -1,6 +1,17 @@
 # ICC Color Brightness WIP
 use ICC color profiles to change the brightness of the display
 inspired by [icc-brightness](https://github.com/udifuchs/icc-brightness) but more performant and does not produces ICC files in local directory
+> NOTE: currently only **intel_backlight** is used for backlight change
+
+## Installation
+```bash
+mkdir build && cd build
+cmake ..
+make install
+```
+### Archlinux
+- [aur-package](https://aur.archlinux.org/packages/colord-brightness)
+
 
 ## Dependencies
 ```bash
@@ -31,14 +42,12 @@ cmake
 ### Todo
 - add commandline interface
 - add config file?
-- add AUR package
-- add systemd-user-script
 - improve structure
 - improve readme
 
 ### workarround for icc file
 - for a icc profile (which is needed for a setting it system wide) a file need to be saved some ware -> read/write in the slow SSD 
-- as a work arround, 2 solutions:
+- as a work arround, 3 solutions:
     1. save the file in a tmpfs
     2. use a named pipe as a file, eg.:
     ```bash
