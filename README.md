@@ -42,14 +42,12 @@ cmake
 ### Todo
 - add commandline interface
 - add config file?
-- add AUR package
-- add systemd-user-script
 - improve structure
 - improve readme
 
 ### workarround for icc file
 - for a icc profile (which is needed for a setting it system wide) a file need to be saved some ware -> read/write in the slow SSD 
-- as a work arround, 2 solutions:
+- as a work arround, 3 solutions:
     1. save the file in a tmpfs
     2. use a named pipe as a file, eg.:
     ```bash
