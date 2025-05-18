@@ -6,12 +6,11 @@ inspired by [icc-brightness](https://github.com/udifuchs/icc-brightness) but mor
 ## Installation
 ```bash
 mkdir build && cd build
-cmake ..
+cmake -D CMAKE_BUILD_TYPE=Release ..
 make install
 ```
 ### Archlinux
 - [aur-package](https://aur.archlinux.org/packages/colord-brightness)
-
 
 ## Dependencies
 ```bash
@@ -31,7 +30,7 @@ cmake
 - this file is a file only in memory, and only exist as long as the programm runs (it uses the syscall [memfd_create](https://www.man7.org/linux/man-pages/man2/memfd_create.2.html#top_of_page))
 
 ## Where it works
-- should work on all linux-based systems using the colord-daemon for color management **and a compositor (wayland or Xorg) which supports color-manaement** (e.g. Gnome, KDE, etc)
+- should work on all linux-based systems using the colord-daemon for color management **and a compositor (wayland or Xorg) which supports color-management** (e.g. Gnome, KDE, etc)
 ### Currently testet on
 - Archlinux with Gnome
 ### Compositor not working with
